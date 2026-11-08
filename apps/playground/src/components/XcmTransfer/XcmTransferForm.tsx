@@ -13,8 +13,10 @@ import {
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import type { TChain } from '@paraspell/sdk';
+import type { TAssetInfo } from '@paraspell/sdk';
 import {
   CHAINS,
+  deepEqual,
   formatUnits,
   hydrateCustomChain,
   isChainEvmImpl,
@@ -35,7 +37,7 @@ import {
   useQueryStates,
 } from 'nuqs';
 import type { FC, FormEvent } from 'react';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import {
   DEFAULT_ADDRESS,
@@ -476,8 +478,43 @@ const XcmTransferFormContent: FC<Props> = ({
     }
   }, [isNotParaToPara, currencyMap]);
 
-  // Ensure that the fee asset is valid when the form values change
+  const prevMergedCurrencyMapRef =
+    useRef<Record<string, TAssetInfo>>(mergedCurrencyMap);
+  const prevFeeCurrencyMapRef =
+    useRef<Record<string, TAssetInfo>>(feeCurrencyMap);
+
+  // Re-validate or clear currency selections when chains or available currency options change
   useEffect(() => {
+    const prevMap = prevMergedCurrencyMapRef.current;
+    prevMergedCurrencyMapRef.current = mergedCurrencyMap;
+
+    if (isNotParaToPara && Object.keys(currencyMap).length === 1) {
+      return;
+    }
+
+    form.values.currencies.forEach((currency, index) => {
+      if (currency.isCustomCurrency || !currency.currencyOptionId) return;
+
+      const isOptionStillPresent = mergedCurrencyOptions.some(
+        (option) => option.value === currency.currencyOptionId,
+      );
+      const prevAsset = prevMap[currency.currencyOptionId];
+      const nextAsset = mergedCurrencyMap[currency.currencyOptionId];
+      const locationChanged =
+        Boolean(prevAsset && nextAsset) &&
+        !deepEqual(prevAsset.location, nextAsset.location);
+
+      if (!isOptionStillPresent || locationChanged) {
+        form.setFieldValue(`currencies.${index}.currencyOptionId`, '');
+      }
+    });
+  }, [from, to, mergedCurrencyOptions, mergedCurrencyMap, isNotParaToPara, currencyMap]);
+
+  // Ensure that the fee asset is valid and resolves to the same location when the form values change
+  useEffect(() => {
+    const prevFeeMap = prevFeeCurrencyMapRef.current;
+    prevFeeCurrencyMapRef.current = feeCurrencyMap;
+
     const currentFeeAssetIsCustom = form.values.feeAsset.isCustomCurrency;
     const feeAssetOptionId = form.values.feeAsset.currencyOptionId;
 
@@ -485,12 +522,17 @@ const XcmTransferFormContent: FC<Props> = ({
       const isOptionStillValid = feeCurrencyOptions.some(
         (option) => option.value === feeAssetOptionId,
       );
+      const prevFeeAsset = prevFeeMap[feeAssetOptionId];
+      const nextFeeAsset = feeCurrencyMap[feeAssetOptionId];
+      const locationChanged =
+        Boolean(prevFeeAsset && nextFeeAsset) &&
+        !deepEqual(prevFeeAsset.location, nextFeeAsset.location);
 
-      if (!isOptionStillValid) {
+      if (!isOptionStillValid || locationChanged) {
         form.setFieldValue('feeAsset.currencyOptionId', '');
       }
     }
-  }, [from, feeCurrencyOptions, form.values.feeAsset.isCustomCurrency]);
+  }, [from, to, feeCurrencyOptions, feeCurrencyMap, form.values.feeAsset.isCustomCurrency]);
 
   const onSwap = () => {
     const { from, to } = form.getValues();
