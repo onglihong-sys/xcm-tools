@@ -556,4 +556,34 @@ describe('findAssetInfo', () => {
     expect(asset).toHaveProperty('symbol')
     expect(asset).toHaveProperty('assetId')
   })
+
+  it('falls back to normal lookup when destination is Ethereum and asset is not Ethereum-origin (e.g. DOT/MYTH)', () => {
+    vi.mocked(getOtherAssetsImpl).mockReturnValue([dotAsset])
+    expect(findAssetInfo('Hydration', { symbol: 'DOT' }, 'Ethereum')).toBe(dotAsset)
+    expect(findAssetInfo('Hydration', { symbol: Foreign('DOT') }, 'Ethereum')).toBe(dotAsset)
+
+    const mythAsset: TAssetInfo = {
+      symbol: 'MYTH',
+      decimals: 18,
+      existentialDeposit: '1000',
+      isNative: true,
+      location: { parents: 0, interior: 'Here' }
+    }
+    vi.mocked(getNativeAssetsImpl).mockReturnValue([mythAsset])
+    expect(findAssetInfo('Mythos', { symbol: 'MYTH' }, 'Ethereum')).toBe(mythAsset)
+  })
+
+  it('uses chainId 11155111 when destination is EthereumTestnet', () => {
+    const sepoliaWeth: TAssetInfo = {
+      ...wethAsset,
+      location: {
+        parents: 2,
+        interior: {
+          X1: [{ GlobalConsensus: { Ethereum: { chainId: 11155111 } } }]
+        }
+      }
+    }
+    vi.mocked(getOtherAssetsImpl).mockReturnValue([sepoliaWeth])
+    expect(findAssetInfo('AssetHubPaseo', { symbol: 'WETH' }, 'EthereumTestnet')).toBe(sepoliaWeth)
+  })
 })
