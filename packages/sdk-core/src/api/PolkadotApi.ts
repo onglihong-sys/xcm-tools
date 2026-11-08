@@ -370,31 +370,56 @@ export abstract class PolkadotApi<TApi, TRes, TSigner, TCustomChain extends stri
     const entry = this._customCtx.customChains?.[chain]
     if (!entry) return
 
-    const needsProps =
-      entry.ss58Prefix === undefined ||
-      entry.nativeAssetSymbol === undefined ||
-      entry.nativeAssetDecimals === undefined
-    if (needsProps) {
-      const props = await this.getSystemProperties()
-      if (entry.ss58Prefix === undefined && typeof props.ss58Format === 'number') {
+    const props = await this.getSystemProperties()
+    if (typeof props.ss58Format === 'number') {
+      if (entry.ss58Prefix === undefined) {
         entry.ss58Prefix = props.ss58Format
       }
-      if (entry.nativeAssetSymbol === undefined && props.tokenSymbol) {
+    }
+    if (props.tokenSymbol) {
+      if (
+        entry.nativeAssetSymbol !== undefined &&
+        !isSymbolMatch(entry.nativeAssetSymbol, props.tokenSymbol)
+      ) {
+        throw new CustomChainInvalidError(
+          `Custom chain '${entry.name}' specifies nativeAssetSymbol '${entry.nativeAssetSymbol}', ` +
+            `but the chain's native asset is '${props.tokenSymbol}'.`
+        )
+      }
+      if (entry.nativeAssetSymbol === undefined) {
         entry.nativeAssetSymbol = props.tokenSymbol
       }
-      if (entry.nativeAssetDecimals === undefined && typeof props.tokenDecimals === 'number') {
+    }
+    if (typeof props.tokenDecimals === 'number') {
+      if (
+        entry.nativeAssetDecimals !== undefined &&
+        entry.nativeAssetDecimals !== props.tokenDecimals
+      ) {
+        throw new CustomChainInvalidError(
+          `Custom chain '${entry.name}' specifies nativeAssetDecimals ${entry.nativeAssetDecimals}, ` +
+            `but the chain's native asset decimals is ${props.tokenDecimals}.`
+        )
+      }
+      if (entry.nativeAssetDecimals === undefined) {
         entry.nativeAssetDecimals = props.tokenDecimals
       }
+    }
 
-      const declaredNativeAsset = entry.assets.find(asset => asset.isNative)
-      if (
-        declaredNativeAsset &&
-        props.tokenSymbol &&
-        !isSymbolMatch(declaredNativeAsset.symbol, props.tokenSymbol)
-      ) {
+    const declaredNativeAsset = entry.assets.find(asset => asset.isNative)
+    if (declaredNativeAsset) {
+      if (props.tokenSymbol && !isSymbolMatch(declaredNativeAsset.symbol, props.tokenSymbol)) {
         throw new CustomChainInvalidError(
           `Custom chain '${entry.name}' declares '${declaredNativeAsset.symbol}' as its native asset, ` +
             `but the chain's native asset is '${props.tokenSymbol}'.`
+        )
+      }
+      if (
+        typeof props.tokenDecimals === 'number' &&
+        declaredNativeAsset.decimals !== props.tokenDecimals
+      ) {
+        throw new CustomChainInvalidError(
+          `Custom chain '${entry.name}' declares native asset '${declaredNativeAsset.symbol}' with decimals ${declaredNativeAsset.decimals}, ` +
+            `but the chain's native asset decimals is ${props.tokenDecimals}.`
         )
       }
     }

@@ -547,7 +547,7 @@ describe('PolkadotApi', () => {
       expect(instance._customCtx.customChainAssets?.MyCustom).toBeDefined()
     })
 
-    it('skips system-property fetching when all native props are already set', async () => {
+    it('validates supplied nativeAssetDecimals and declared native asset decimals against system properties', async () => {
       vi.mocked(resolveChainApi).mockResolvedValue({})
       const instance = new ConcreteApi({
         customChains: {
@@ -557,7 +557,7 @@ describe('PolkadotApi', () => {
             providers: [{ name: 'rpc', endpoint: 'wss://example' }],
             ss58Prefix: 42,
             nativeAssetSymbol: 'CUS',
-            nativeAssetDecimals: 12
+            nativeAssetDecimals: 6
           }
         }
       })
@@ -569,13 +569,12 @@ describe('PolkadotApi', () => {
       instance.fetchPalletList = vi.fn(() =>
         Promise.resolve([{ name: 'Balances', index: 1, hasExtrinsics: true }])
       )
-      const sysProps = vi.fn(() => Promise.resolve({}))
-      instance.getSystemProperties = sysProps
+      instance.getSystemProperties = vi.fn(() =>
+        Promise.resolve({ ss58Format: 42, tokenSymbol: 'CUS', tokenDecimals: 12 })
+      )
       vi.spyOn(instance, 'getConstant').mockResolvedValue(500n)
 
-      await instance.init('MyCustom')
-
-      expect(sysProps).not.toHaveBeenCalled()
+      await expect(instance.init('MyCustom')).rejects.toThrow(CustomChainInvalidError)
     })
 
     it('returns early in maybeHydrateCustomChain when chain is not a custom chain', async () => {

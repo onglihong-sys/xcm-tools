@@ -1,4 +1,4 @@
-import { canonicalizeLocation, type TAssetInfo, type TChainAssetsInfo } from '@paraspell/assets'
+import { canonicalizeLocation, isSymbolMatch, type TAssetInfo, type TChainAssetsInfo } from '@paraspell/assets'
 import type { TAssetsPallet, TCustomChainPallets, TPalletEntry } from '@paraspell/pallets'
 import {
   ASSETS_PALLETS,
@@ -76,8 +76,49 @@ const validate = (name: string, input: TCustomChainInput): void => {
     )
   }
   validatePalletsInput(name, input.pallets)
+  if (
+    input.nativeAssetDecimals !== undefined &&
+    (typeof input.nativeAssetDecimals !== 'number' ||
+      !Number.isInteger(input.nativeAssetDecimals) ||
+      input.nativeAssetDecimals < 0 ||
+      input.nativeAssetDecimals > 36)
+  ) {
+    throw new CustomChainInvalidError(
+      `Custom chain '${name}' has invalid nativeAssetDecimals: ${String(input.nativeAssetDecimals)}.`
+    )
+  }
   const seen: TLocation[] = []
   for (const asset of input.assets ?? []) {
+    if (
+      typeof asset.decimals !== 'number' ||
+      !Number.isInteger(asset.decimals) ||
+      asset.decimals < 0 ||
+      asset.decimals > 36
+    ) {
+      throw new CustomChainInvalidError(
+        `Custom chain '${name}' has invalid decimals for asset '${asset.symbol}': ${String(asset.decimals)}.`
+      )
+    }
+    if (
+      asset.isNative &&
+      input.nativeAssetDecimals !== undefined &&
+      asset.decimals !== input.nativeAssetDecimals
+    ) {
+      throw new CustomChainInvalidError(
+        `Custom chain '${name}' declares native asset '${asset.symbol}' with decimals ${asset.decimals}, ` +
+          `which does not match nativeAssetDecimals (${input.nativeAssetDecimals}).`
+      )
+    }
+    if (
+      asset.isNative &&
+      input.nativeAssetSymbol !== undefined &&
+      !isSymbolMatch(asset.symbol, input.nativeAssetSymbol)
+    ) {
+      throw new CustomChainInvalidError(
+        `Custom chain '${name}' declares native asset '${asset.symbol}', ` +
+          `which does not match nativeAssetSymbol '${input.nativeAssetSymbol}'.`
+      )
+    }
     if (seen.some(loc => deepEqual(loc, asset.location))) {
       throw new CustomChainInvalidError(
         `Custom chain '${name}' has duplicate asset location for '${asset.symbol}'.`
