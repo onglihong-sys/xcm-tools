@@ -309,7 +309,10 @@ export class XTransferService {
 
     try {
       for (const transfer of transfers) {
-        const finalBuilder = this.buildXTransfer(builder, transfer);
+        const finalBuilder = this.buildXTransfer(builder, {
+          ...transfer,
+          options: optionsWithoutMode,
+        });
         builder = finalBuilder.addToBatch();
       }
 

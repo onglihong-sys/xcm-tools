@@ -820,6 +820,48 @@ describe('XTransferService', () => {
       );
     });
 
+    it('honours top-level options.customChains for batch items and surfaces unknown chains as BadRequestException', async () => {
+      const customBatchDto = {
+        transfers: [
+          {
+            from: 'MyCustomChain',
+            to: 'Acala',
+            recipient,
+            currency,
+          },
+        ],
+        options: {
+          mode: paraspellSdk.BatchMode.BATCH_ALL,
+          customChains: {
+            MyCustomChain: {
+              paraId: 4242,
+              ecosystem: 'Polkadot',
+              xcmVersion: paraspellSdk.Version.V4,
+              providers: ['wss://rpc.mychain.example'],
+            },
+          },
+        },
+      } as unknown as BatchXTransferDto;
+
+      const result = await service.generateBatchXcmCall(customBatchDto);
+      expect(result).toBe(txHashBatch);
+
+      const unknownChainBatchDto = {
+        transfers: [
+          {
+            from: 'UnregisteredCustomChain',
+            to: 'Acala',
+            recipient,
+            currency,
+          },
+        ],
+      } as unknown as BatchXTransferDto;
+
+      await expect(
+        service.generateBatchXcmCall(unknownChainBatchDto),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should generate batch XCM call for transfers with only fromChain (parachain to relaychain)', async () => {
       const from: TChain = 'Acala';
 

@@ -16,6 +16,14 @@ describe('handleXcmApiError', () => {
     expect(handleError).toThrow('SDK error');
   });
 
+  it('rethrows HttpException instances unchanged', () => {
+    const handleError = () =>
+      handleXcmApiError(new BadRequestException('Invalid batch chain'));
+
+    expect(handleError).toThrow(BadRequestException);
+    expect(handleError).toThrow('Invalid batch chain');
+  });
+
   it('throws InternalServerErrorException for other errors', () => {
     const handleError = () => handleXcmApiError(new Error('Unexpected error'));
 
