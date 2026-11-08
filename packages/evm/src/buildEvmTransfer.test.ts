@@ -1,5 +1,5 @@
 import type { PolkadotApi, TBuildEvmTransferOptions } from '@paraspell/sdk-core'
-import { UnsupportedOperationError } from '@paraspell/sdk-core'
+import { ScenarioNotSupportedError, UnsupportedOperationError } from '@paraspell/sdk-core'
 import { darwinia } from 'viem/chains'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -35,6 +35,15 @@ describe('buildEvmTransfer', () => {
     expect(buildXTokensEvm).toHaveBeenCalledWith(expect.any(Object))
     expect(result).toEqual(evmTx)
   })
+
+  it.each(['Karura', 'AssetHubKusama', 'Kusama'] as const)(
+    'throws ScenarioNotSupportedError for Kusama-ecosystem destination %s',
+    async to => {
+      await expect(buildEvmTransfer({ ...baseOptions, to })).rejects.toThrow(
+        ScenarioNotSupportedError
+      )
+    }
+  )
 
   it('throws UnsupportedOperationError for non-EVM origins', async () => {
     await expect(buildEvmTransfer({ ...baseOptions, from: 'Acala' })).rejects.toThrow(
