@@ -36,6 +36,71 @@ export const downloadCustomConfig = (config: TCustomConfigFile) => {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const isNonEmptyString = (value: unknown): value is string =>
+  typeof value === 'string' && value.trim().length > 0;
+
+const isNonNegativeInt = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= 0;
+
+const validateAssetEntry = (asset: unknown, label: string): void => {
+  if (!isRecord(asset)) {
+    throw new Error(`${label} must be an object.`);
+  }
+  if (!isNonEmptyString(asset.symbol)) {
+    throw new Error(`${label} must have a non-empty string "symbol".`);
+  }
+  if (!isNonNegativeInt(asset.decimals)) {
+    throw new Error(`${label} must have a non-negative integer "decimals".`);
+  }
+  if (!isRecord(asset.location)) {
+    throw new Error(`${label} must have a valid "location" object.`);
+  }
+  if (typeof asset.existentialDeposit !== 'string') {
+    throw new Error(`${label} must have a string "existentialDeposit".`);
+  }
+  try {
+    BigInt(asset.existentialDeposit);
+  } catch {
+    throw new Error(`${label} "existentialDeposit" must be a valid integer string.`);
+  }
+  if (asset.isNative !== undefined && typeof asset.isNative !== 'boolean') {
+    throw new Error(`${label} "isNative" must be a boolean when provided.`);
+  }
+};
+
+const validateCustomChainEntry = (entry: unknown, name: string): void => {
+  if (!isRecord(entry)) {
+    throw new Error(`Custom chain "${name}" must be an object.`);
+  }
+  const { input, assetsInfo } = entry;
+  if (!isRecord(input)) {
+    throw new Error(`Custom chain "${name}" is missing a valid "input" object.`);
+  }
+  if (!isNonNegativeInt(input.paraId)) {
+    throw new Error(`Custom chain "${name}" must have a non-negative integer "paraId".`);
+  }
+  if (!isNonEmptyString(input.ecosystem)) {
+    throw new Error(`Custom chain "${name}" must have a valid "ecosystem".`);
+  }
+  if (!Array.isArray(input.providers) || input.providers.length === 0) {
+    throw new Error(`Custom chain "${name}" must have a non-empty "providers" array.`);
+  }
+  for (const provider of input.providers) {
+    if (!isRecord(provider) || !isNonEmptyString(provider.name) || !isNonEmptyString(provider.endpoint)) {
+      throw new Error(`Custom chain "${name}" contains an invalid provider entry.`);
+    }
+  }
+  if (!isRecord(assetsInfo)) {
+    throw new Error(`Custom chain "${name}" is missing a valid "assetsInfo" object.`);
+  }
+  if (!Array.isArray(assetsInfo.assets)) {
+    throw new Error(`Custom chain "${name}" "assetsInfo.assets" must be an array.`);
+  }
+  assetsInfo.assets.forEach((asset, idx) =>
+    validateAssetEntry(asset, `Custom chain "${name}" asset[${idx}]`),
+  );
+};
+
 export const parseCustomConfig = (text: string): TCustomConfigFile => {
   let parsed: unknown;
   try {
@@ -64,10 +129,27 @@ export const parseCustomConfig = (text: string): TCustomConfigFile => {
     );
   }
 
+  if (customChains !== undefined) {
+    for (const [chainName, entry] of Object.entries(customChains)) {
+      validateCustomChainEntry(entry, chainName);
+    }
+  }
+
+  if (customAssets !== undefined) {
+    for (const [chainName, assets] of Object.entries(customAssets)) {
+      if (!Array.isArray(assets)) {
+        throw new Error(`"customAssets.${chainName}" must be an array.`);
+      }
+      assets.forEach((asset, idx) =>
+        validateAssetEntry(asset, `"customAssets.${chainName}[${idx}]"`),
+      );
+    }
+  }
+
   return {
     version:
       typeof parsed.version === 'number' ? parsed.version : CONFIG_VERSION,
     customChains: (customChains ?? {}) as TStoredCustomChains,
-    customAssets: customAssets ?? {},
+    customAssets: (customAssets ?? {}) as TCustomAssetsMap,
   };
 };
