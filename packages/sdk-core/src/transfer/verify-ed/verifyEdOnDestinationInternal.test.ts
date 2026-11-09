@@ -261,10 +261,32 @@ describe('verifyEdOnDestinationInternal', () => {
     expect(result).toBe(true)
   })
 
-  it('returns false when balance < ED and amount - destFee <= ED', async () => {
+  it('returns true when balance < ED and balance + amount - destFee >= ED', async () => {
     const opts = {
       ...defaultOptions,
-      currency: { ...defaultOptions.currency, amount: 10000000000n }
+      currency: { ...defaultOptions.currency, amount: 6000000000n }
+    }
+    vi.mocked(getAssetBalanceInternal).mockResolvedValue(5000000000n)
+
+    const result = await verifyEdOnDestinationInternal(opts)
+    expect(result).toBe(true)
+  })
+
+  it('returns true when balance is 0 and amount - destFee equals exact ED boundary', async () => {
+    const opts = {
+      ...defaultOptions,
+      currency: { ...defaultOptions.currency, amount: 11000000000n }
+    }
+    vi.mocked(getAssetBalanceInternal).mockResolvedValue(0n)
+
+    const result = await verifyEdOnDestinationInternal(opts)
+    expect(result).toBe(true)
+  })
+
+  it('returns false when balance < ED and balance + amount - destFee < ED', async () => {
+    const opts = {
+      ...defaultOptions,
+      currency: { ...defaultOptions.currency, amount: 5000000000n }
     }
     vi.mocked(getAssetBalanceInternal).mockResolvedValue(5000000000n)
 
