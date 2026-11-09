@@ -77,7 +77,20 @@ const resolveErc20Info = async (
 }
 
 const HOLLAR_OVERRIDE = {
-  location: { parents: 1, interior: { X2: [{ Parachain: 2034 }, { GeneralIndex: 222 }] } },
+  location: {
+    parents: 1,
+    interior: {
+      X2: [
+        { Parachain: 2034 },
+        {
+          AccountKey20: {
+            network: null,
+            key: '0x531a654d1696ed52e7275a8cede955e82620f99a'
+          }
+        }
+      ]
+    }
+  },
   isFeeAsset: true
 }
 
